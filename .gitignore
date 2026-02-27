@@ -1,0 +1,10 @@
+# E-commerce Backend API
+.env
+node_modules/
+.DS_Store
+*.log
+dist/
+build/
+uploads/
+.vscode/
+.idea/
