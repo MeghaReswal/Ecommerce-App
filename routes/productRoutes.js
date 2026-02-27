@@ -17,16 +17,14 @@ import validationSchemas from "../utils/validationSchemas.js";
 
 const router = express.Router();
 
-// Public routes
+// Public routes 
 router.get("/", getAllProducts);
 router.get("/search", searchProducts);
 router.get("/slug/:slug", getProductBySlug);
 router.get("/category/:categoryId", getProductsByCategory);
 router.get("/:id", getProductById);
 
-router.post(
-  "/:id/review",
-  auth,
+router.post("/:id/review", auth,
   permissionCheck("product.addReview"),
   addProductReview,
 );
