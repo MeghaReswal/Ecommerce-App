@@ -24,7 +24,6 @@ router.get("/slug/:slug", getProductBySlug);
 router.get("/category/:categoryId", getProductsByCategory);
 router.get("/:id", getProductById);
 
-// Protected routes (User)
 router.post(
   "/:id/review",
   auth,
