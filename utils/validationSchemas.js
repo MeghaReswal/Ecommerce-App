@@ -1,18 +1,18 @@
-import Joi from 'joi';
+import Joi from "joi";
 
 const validationSchemas = {
   // User Validation
   registerUser: Joi.object({
     firstName: Joi.string().required().min(2).max(50).messages({
-      'string.empty': 'First name is required',
-      'string.min': 'First name must be at least 2 characters',
+      "string.empty": "First name is required",
+      "string.min": "First name must be at least 2 characters",
     }),
     lastName: Joi.string().required().min(2).max(50),
     email: Joi.string().email().required().messages({
-      'string.email': 'Please provide a valid email',
+      "string.email": "Please provide a valid email",
     }),
     password: Joi.string().required().min(6).messages({
-      'string.min': 'Password must be at least 6 characters',
+      "string.min": "Password must be at least 6 characters",
     }),
     phone: Joi.string().optional(),
   }),
@@ -25,7 +25,7 @@ const validationSchemas = {
   verifyOTP: Joi.object({
     email: Joi.string().email().required(),
     otp: Joi.string().length(6).required().messages({
-      'string.length': 'OTP must be 6 digits',
+      "string.length": "OTP must be 6 digits",
     }),
   }),
 
@@ -50,7 +50,6 @@ const validationSchemas = {
     originalPrice: Joi.number().optional(),
     discount: Joi.number().optional().min(0).max(100),
     category: Joi.string().required(),
-    stock: Joi.number().required().min(0),
     sku: Joi.string().optional(),
     attributes: Joi.object({
       size: Joi.array().items(Joi.string()).optional(),
@@ -121,8 +120,46 @@ const validationSchemas = {
     }).optional(),
     paymentMethod: Joi.string()
       .required()
-      .valid('credit_card', 'debit_card', 'upi', 'paypal', 'wallet'),
+      .valid("credit_card", "debit_card", "upi", "paypal", "wallet"),
   }),
+
+  createInventory: Joi.object({
+    productId: Joi.string().required(),
+
+    total_stock: Joi.number().required().min(0).messages({
+      "number.base": "Total stock must be a number",
+      "number.min": "Total stock cannot be negative",
+      "any.required": "Total stock is required",
+    }),
+
+    reserved_stock: Joi.number().min(0).optional().messages({
+      "number.min": "Reserved stock cannot be negative",
+    }),
+
+    price: Joi.number().required().min(0).messages({
+      "number.base": "Price must be a number",
+      "number.min": "Price cannot be negative",
+      "any.required": "Price is required",
+    }),
+
+    backorder_allowed: Joi.boolean().optional(),
+
+    low_stock_threshold: Joi.number().min(0).optional().messages({
+      "number.min": "Low stock threshold cannot be negative",
+    }),
+  }),
+
+  updateInventory: Joi.object({
+    total_stock: Joi.number().min(0).optional(),
+
+    reserved_stock: Joi.number().min(0).optional(),
+
+    price: Joi.number().min(0).optional(),
+
+    backorder_allowed: Joi.boolean().optional(),
+
+    low_stock_threshold: Joi.number().min(0).optional(),
+  }).min(1), // Prevent empty body update
 };
 
 export default validationSchemas;

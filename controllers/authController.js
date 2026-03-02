@@ -98,14 +98,14 @@ export const loginUser = async (req, res, next) => {
     await user.save();
 
     // Send OTP email
-    await sendOTPEmail(user.email, otp);
+    // await sendOTPEmail(user.email, otp);
 
     res
       .status(200)
       .json(
         new ApiResponse(
           200,
-          { email: user.email },
+          { email: user.email, otp: otp },
           "OTP sent successfully to your email",
         ),
       );

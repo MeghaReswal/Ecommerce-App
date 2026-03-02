@@ -1,78 +1,81 @@
-import Cart from '../models/Cart.js';
-import Product from '../models/Product.js';
-import ApiError from '../utils/ApiError.js';
-import ApiResponse from '../utils/ApiResponse.js';
+import Cart from "../models/Cart.js";
+import Product from "../models/Product.js";
+import ApiError from "../utils/ApiError.js";
+import ApiResponse from "../utils/ApiResponse.js";
 
 // Get User Cart
 export const getCart = async (req, res, next) => {
   try {
-    let cart = await Cart.findOne({ userId: req.userId }).populate('items.productId');
+    let cart = await Cart.findOne({ userId: req.userId }).populate(
+      "items.productId",
+    );
 
     if (!cart) {
       cart = await Cart.create({ userId: req.userId, items: [] });
     }
 
-    res.status(200).json(
-      new ApiResponse(200, cart, 'Cart retrieved successfully')
-    );
+    res
+      .status(200)
+      .json(new ApiResponse(200, cart, "Cart retrieved successfully"));
   } catch (error) {
     next(error);
   }
 };
 
 // Add Item to Cart
-export const addToCart = async (req, res, next) => {
+export async function addToCart(req, res) {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
   try {
-    const { productId, quantity, selectedAttributes } = req.body;
+    const userId = req.user.id;
+    const { productId, quantity } = req.body;
 
-    // Validate product exists and has stock
-    const product = await Product.findById(productId);
-    if (!product) {
-      throw new ApiError(404, 'Product not found');
-    }
-
-    if (product.stock < quantity) {
-      throw new ApiError(400, 'Insufficient stock');
-    }
-
-    // Find or create cart
-    let cart = await Cart.findOne({ userId: req.userId });
-    if (!cart) {
-      cart = await Cart.create({ userId: req.userId, items: [] });
-    }
-
-    // Check if item already in cart
-    const existingItem = cart.items.find(
-      (item) => item.productId.toString() === productId && 
-      JSON.stringify(item.selectedAttributes) === JSON.stringify(selectedAttributes || {})
+    const productInventory = await Inventory.findOne({ productId }).session(
+      session,
     );
 
-    if (existingItem) {
-      // Update quantity
-      existingItem.quantity += quantity;
+    if (!productInventory) {
+      throw new Error("Product not found");
+    }
+
+    const availableStock =
+      productInventory.total_stock - productInventory.reserved_stock;
+
+    if (availableStock < quantity) {
+      throw new Error("Insufficient stock");
+    }
+
+    // Atomic update
+    productInventory.reserved_stock += quantity;
+    await productInventory.save({ session });
+
+    let cartItem = await Cart.findOne({ userId, productId }).session(session);
+
+    if (cartItem) {
+      cartItem.quantity += quantity;
+      cartItem.reserved_until = new Date(Date.now() + 15 * 60 * 1000);
     } else {
-      // Add new item
-      cart.items.push({
+      cartItem = new Cart({
+        userId,
         productId,
         quantity,
-        price: product.price,
-        selectedAttributes: selectedAttributes || {},
+        reserved_until: new Date(Date.now() + 15 * 60 * 1000),
       });
     }
 
-    // Calculate total
-    calculateCartTotal(cart);
-    await cart.save();
+    await cartItem.save({ session });
 
-    const populatedCart = await cart.populate('items.productId');
+    await session.commitTransaction();
+    session.endSession();
 
-    res.status(200).json(
-      new ApiResponse(200, populatedCart, 'Item added to cart successfully')
-    );
+    return res.json({ message: "Item added to cart", cartItem });
   } catch (error) {
-    next(error);
+    await session.abortTransaction();
+    session.endSession();
+    return res.status(400).json({ message: error.message });
   }
-};
+}
 
 // Update Cart Item
 export const updateCartItem = async (req, res, next) => {
@@ -81,37 +84,41 @@ export const updateCartItem = async (req, res, next) => {
     const { quantity } = req.body;
 
     if (quantity <= 0) {
-      throw new ApiError(400, 'Quantity must be greater than 0');
+      throw new ApiError(400, "Quantity must be greater than 0");
     }
 
     const product = await Product.findById(productId);
     if (!product) {
-      throw new ApiError(404, 'Product not found');
+      throw new ApiError(404, "Product not found");
     }
 
     if (product.stock < quantity) {
-      throw new ApiError(400, 'Insufficient stock');
+      throw new ApiError(400, "Insufficient stock");
     }
 
     const cart = await Cart.findOne({ userId: req.userId });
     if (!cart) {
-      throw new ApiError(404, 'Cart not found');
+      throw new ApiError(404, "Cart not found");
     }
 
-    const item = cart.items.find((item) => item.productId.toString() === productId);
+    const item = cart.items.find(
+      (item) => item.productId.toString() === productId,
+    );
     if (!item) {
-      throw new ApiError(404, 'Item not found in cart');
+      throw new ApiError(404, "Item not found in cart");
     }
 
     item.quantity = quantity;
     calculateCartTotal(cart);
     await cart.save();
 
-    const populatedCart = await cart.populate('items.productId');
+    const populatedCart = await cart.populate("items.productId");
 
-    res.status(200).json(
-      new ApiResponse(200, populatedCart, 'Cart item updated successfully')
-    );
+    res
+      .status(200)
+      .json(
+        new ApiResponse(200, populatedCart, "Cart item updated successfully"),
+      );
   } catch (error) {
     next(error);
   }
@@ -124,19 +131,27 @@ export const removeFromCart = async (req, res, next) => {
 
     const cart = await Cart.findOne({ userId: req.userId });
     if (!cart) {
-      throw new ApiError(404, 'Cart not found');
+      throw new ApiError(404, "Cart not found");
     }
 
-    cart.items = cart.items.filter((item) => item.productId.toString() !== productId);
+    cart.items = cart.items.filter(
+      (item) => item.productId.toString() !== productId,
+    );
 
     calculateCartTotal(cart);
     await cart.save();
 
-    const populatedCart = await cart.populate('items.productId');
+    const populatedCart = await cart.populate("items.productId");
 
-    res.status(200).json(
-      new ApiResponse(200, populatedCart, 'Item removed from cart successfully')
-    );
+    res
+      .status(200)
+      .json(
+        new ApiResponse(
+          200,
+          populatedCart,
+          "Item removed from cart successfully",
+        ),
+      );
   } catch (error) {
     next(error);
   }
@@ -148,16 +163,16 @@ export const clearCart = async (req, res, next) => {
     const cart = await Cart.findOneAndUpdate(
       { userId: req.userId },
       { items: [], totalPrice: 0, totalDiscount: 0, couponDiscount: 0 },
-      { new: true }
+      { new: true },
     );
 
     if (!cart) {
-      throw new ApiError(404, 'Cart not found');
+      throw new ApiError(404, "Cart not found");
     }
 
-    res.status(200).json(
-      new ApiResponse(200, cart, 'Cart cleared successfully')
-    );
+    res
+      .status(200)
+      .json(new ApiResponse(200, cart, "Cart cleared successfully"));
   } catch (error) {
     next(error);
   }

@@ -1,17 +1,17 @@
-import mongoose from 'mongoose';
+import mongoose from "mongoose";
 
 const productSchema = new mongoose.Schema(
   {
     name: {
       type: String,
-      required: [true, 'Please provide a product name'],
+      required: [true, "Please provide a product name"],
       trim: true,
       minlength: 3,
       maxlength: 200,
     },
     description: {
       type: String,
-      required: [true, 'Please provide a product description'],
+      required: [true, "Please provide a product description"],
       minlength: 10,
     },
     slug: {
@@ -21,7 +21,7 @@ const productSchema = new mongoose.Schema(
     },
     price: {
       type: Number,
-      required: [true, 'Please provide a product price'],
+      required: [true, "Please provide a product price"],
       min: 0,
     },
     originalPrice: {
@@ -36,8 +36,8 @@ const productSchema = new mongoose.Schema(
     },
     category: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'Category',
-      required: [true, 'Please provide a category'],
+      ref: "Category",
+      required: [true, "Please provide a category"],
     },
     images: [
       {
@@ -45,12 +45,6 @@ const productSchema = new mongoose.Schema(
         alt: String,
       },
     ],
-    stock: {
-      type: Number,
-      required: [true, 'Please provide stock quantity'],
-      min: 0,
-      default: 0,
-    },
     sku: {
       type: String,
       unique: true,
@@ -89,22 +83,27 @@ const productSchema = new mongoose.Schema(
     },
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'User',
-      required: true,
+      ref: "User",
+      required: false,
+    },
+    inventoryId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Inventory", // links to Inventory collection
+      required: false,
     },
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 // Generate slug before saving
-productSchema.pre('save', function (next) {
+productSchema.pre("save", function (next) {
   if (!this.slug) {
     this.slug = this.name
       .toLowerCase()
-      .replace(/\s+/g, '-')
-      .replace(/[^\w-]/g, '');
+      .replace(/\s+/g, "-")
+      .replace(/[^\w-]/g, "");
   }
   next();
 });
@@ -113,6 +112,6 @@ productSchema.pre('save', function (next) {
 productSchema.index({ slug: 1 });
 productSchema.index({ category: 1 });
 productSchema.index({ isActive: 1 });
-productSchema.index({ name: 'text', description: 'text' });
+productSchema.index({ name: "text", description: "text" });
 
-export default mongoose.model('Product', productSchema);
+export default mongoose.model("Product", productSchema);

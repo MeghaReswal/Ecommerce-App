@@ -1,18 +1,28 @@
-import Product from '../models/Product.js';
-import Category from '../models/Category.js';
-import ApiError from '../utils/ApiError.js';
-import ApiResponse from '../utils/ApiResponse.js';
+import Product from "../models/Product.js";
+import Category from "../models/Category.js";
+import ApiError from "../utils/ApiError.js";
+import ApiResponse from "../utils/ApiResponse.js";
+import Inventory from "../models/Inventory.js";
 
 // Create Product (Admin only)
 export const createProduct = async (req, res, next) => {
   try {
-    const { name, description, price, originalPrice, discount, category, stock, sku, attributes } =
-      req.body;
+    const {
+      name,
+      description,
+      price,
+      originalPrice,
+      discount,
+      category,
+      stock,
+      sku,
+      attributes,
+    } = req.body;
 
     // Check if category exists
     const categoryExists = await Category.findById(category);
     if (!categoryExists) {
-      throw new ApiError(404, 'Category not found');
+      throw new ApiError(404, "Category not found");
     }
 
     const product = await Product.create({
@@ -28,11 +38,11 @@ export const createProduct = async (req, res, next) => {
       createdBy: req.userId,
     });
 
-    await product.populate('category');
+    await product.populate("category");
 
-    res.status(201).json(
-      new ApiResponse(201, product, 'Product created successfully')
-    );
+    res
+      .status(201)
+      .json(new ApiResponse(201, product, "Product created successfully"));
   } catch (error) {
     next(error);
   }
@@ -41,7 +51,13 @@ export const createProduct = async (req, res, next) => {
 // Get All Products
 export const getAllProducts = async (req, res, next) => {
   try {
-    const { page = 1, limit = 12, category, search, sortBy = '-createdAt' } = req.query;
+    const {
+      page = 1,
+      limit = 12,
+      category,
+      search,
+      sortBy = "-createdAt",
+    } = req.query;
     const skip = (page - 1) * limit;
 
     // Build filter
@@ -49,13 +65,13 @@ export const getAllProducts = async (req, res, next) => {
     if (category) filter.category = category;
     if (search) {
       filter.$or = [
-        { name: { $regex: search, $options: 'i' } },
-        { description: { $regex: search, $options: 'i' } },
+        { name: { $regex: search, $options: "i" } },
+        { description: { $regex: search, $options: "i" } },
       ];
     }
 
     const products = await Product.find(filter)
-      .populate('category')
+      .populate("category")
       .limit(limit)
       .skip(skip)
       .sort(sortBy)
@@ -75,8 +91,8 @@ export const getAllProducts = async (req, res, next) => {
             pages: Math.ceil(total / limit),
           },
         },
-        'Products retrieved successfully'
-      )
+        "Products retrieved successfully",
+      ),
     );
   } catch (error) {
     next(error);
@@ -86,15 +102,15 @@ export const getAllProducts = async (req, res, next) => {
 // Get Product by ID
 export const getProductById = async (req, res, next) => {
   try {
-    const product = await Product.findById(req.params.id).populate('category');
+    const product = await Product.findById(req.params.id).populate("category");
 
     if (!product || !product.isActive) {
-      throw new ApiError(404, 'Product not found');
+      throw new ApiError(404, "Product not found");
     }
 
-    res.status(200).json(
-      new ApiResponse(200, product, 'Product retrieved successfully')
-    );
+    res
+      .status(200)
+      .json(new ApiResponse(200, product, "Product retrieved successfully"));
   } catch (error) {
     next(error);
   }
@@ -103,15 +119,29 @@ export const getProductById = async (req, res, next) => {
 // Get Product by Slug
 export const getProductBySlug = async (req, res, next) => {
   try {
-    const product = await Product.findOne({ slug: req.params.slug }).populate('category');
+    const product = await Product.findOne({ slug: req.params.slug }).populate(
+      "category",
+    );
 
     if (!product || !product.isActive) {
-      throw new ApiError(404, 'Product not found');
+      throw new ApiError(404, "Product not found");
     }
 
-    res.status(200).json(
-      new ApiResponse(200, product, 'Product retrieved successfully')
-    );
+    // Fetch inventory using productId
+    const inventory = await Inventory.findOne({
+      productId: product._id,
+    });
+
+    const responseData = {
+      ...product.toObject(),
+      inventory, // attach inventory
+    };
+
+    res
+      .status(200)
+      .json(
+        new ApiResponse(200, responseData, "Product retrieved successfully"),
+      );
   } catch (error) {
     next(error);
   }
@@ -127,22 +157,22 @@ export const updateProduct = async (req, res, next) => {
     if (updateData.category) {
       const categoryExists = await Category.findById(updateData.category);
       if (!categoryExists) {
-        throw new ApiError(404, 'Category not found');
+        throw new ApiError(404, "Category not found");
       }
     }
 
     const product = await Product.findByIdAndUpdate(id, updateData, {
       new: true,
       runValidators: true,
-    }).populate('category');
+    }).populate("category");
 
     if (!product) {
-      throw new ApiError(404, 'Product not found');
+      throw new ApiError(404, "Product not found");
     }
 
-    res.status(200).json(
-      new ApiResponse(200, product, 'Product updated successfully')
-    );
+    res
+      .status(200)
+      .json(new ApiResponse(200, product, "Product updated successfully"));
   } catch (error) {
     next(error);
   }
@@ -154,16 +184,16 @@ export const deleteProduct = async (req, res, next) => {
     const product = await Product.findByIdAndUpdate(
       req.params.id,
       { isActive: false },
-      { new: true }
+      { new: true },
     );
 
     if (!product) {
-      throw new ApiError(404, 'Product not found');
+      throw new ApiError(404, "Product not found");
     }
 
-    res.status(200).json(
-      new ApiResponse(200, product, 'Product deleted successfully')
-    );
+    res
+      .status(200)
+      .json(new ApiResponse(200, product, "Product deleted successfully"));
   } catch (error) {
     next(error);
   }
@@ -176,19 +206,22 @@ export const searchProducts = async (req, res, next) => {
     const skip = (page - 1) * limit;
 
     if (!q) {
-      throw new ApiError(400, 'Search query is required');
+      throw new ApiError(400, "Search query is required");
     }
 
     const products = await Product.find(
       { $text: { $search: q }, isActive: true },
-      { score: { $meta: 'textScore' } }
+      { score: { $meta: "textScore" } },
     )
-      .sort({ score: { $meta: 'textScore' } })
-      .populate('category')
+      .sort({ score: { $meta: "textScore" } })
+      .populate("category")
       .limit(limit)
       .skip(skip);
 
-    const total = await Product.countDocuments({ $text: { $search: q }, isActive: true });
+    const total = await Product.countDocuments({
+      $text: { $search: q },
+      isActive: true,
+    });
 
     res.status(200).json(
       new ApiResponse(
@@ -202,8 +235,8 @@ export const searchProducts = async (req, res, next) => {
             pages: Math.ceil(total / limit),
           },
         },
-        'Search results retrieved successfully'
-      )
+        "Search results retrieved successfully",
+      ),
     );
   } catch (error) {
     next(error);
@@ -216,18 +249,18 @@ export const addProductReview = async (req, res, next) => {
     const { rating, comment } = req.body;
 
     if (!rating || rating < 1 || rating > 5) {
-      throw new ApiError(400, 'Rating must be between 1 and 5');
+      throw new ApiError(400, "Rating must be between 1 and 5");
     }
 
     const product = await Product.findById(req.params.id);
 
     if (!product) {
-      throw new ApiError(404, 'Product not found');
+      throw new ApiError(404, "Product not found");
     }
 
     // Check if user already reviewed
     const existingReview = product.reviews.find(
-      (review) => review.userId.toString() === req.userId
+      (review) => review.userId.toString() === req.userId,
     );
 
     if (existingReview) {
@@ -244,15 +277,18 @@ export const addProductReview = async (req, res, next) => {
     }
 
     // Calculate average rating
-    const totalRating = product.reviews.reduce((sum, review) => sum + review.rating, 0);
+    const totalRating = product.reviews.reduce(
+      (sum, review) => sum + review.rating,
+      0,
+    );
     product.rating = totalRating / product.reviews.length;
     product.totalReviews = product.reviews.length;
 
     await product.save();
 
-    res.status(200).json(
-      new ApiResponse(200, product, 'Review added successfully')
-    );
+    res
+      .status(200)
+      .json(new ApiResponse(200, product, "Review added successfully"));
   } catch (error) {
     next(error);
   }
@@ -261,17 +297,23 @@ export const addProductReview = async (req, res, next) => {
 // Get Products by Category
 export const getProductsByCategory = async (req, res, next) => {
   try {
-    const { page = 1, limit = 12, sortBy = '-createdAt' } = req.query;
+    const { page = 1, limit = 12, sortBy = "-createdAt" } = req.query;
     const skip = (page - 1) * limit;
 
-    const products = await Product.find({ category: req.params.categoryId, isActive: true })
-      .populate('category')
+    const products = await Product.find({
+      category: req.params.categoryId,
+      isActive: true,
+    })
+      .populate("category")
       .limit(limit)
       .skip(skip)
       .sort(sortBy)
       .exec();
 
-    const total = await Product.countDocuments({ category: req.params.categoryId, isActive: true });
+    const total = await Product.countDocuments({
+      category: req.params.categoryId,
+      isActive: true,
+    });
 
     res.status(200).json(
       new ApiResponse(
@@ -285,8 +327,8 @@ export const getProductsByCategory = async (req, res, next) => {
             pages: Math.ceil(total / limit),
           },
         },
-        'Products retrieved successfully'
-      )
+        "Products retrieved successfully",
+      ),
     );
   } catch (error) {
     next(error);

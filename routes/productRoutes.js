@@ -48,4 +48,12 @@ router.put(
 
 router.delete("/:id", auth, permissionCheck("product.delete"), deleteProduct);
 
+router.post(
+  "/inventory",
+  auth,
+  permissionCheck("product.create"),
+  validate(validationSchemas.createProduct),
+  createProduct,
+);
+
 export default router;
